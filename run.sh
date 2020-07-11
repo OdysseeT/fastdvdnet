@@ -2,8 +2,8 @@
 
 
 
-rm -rf frames_in frames_out results
-mkdir frames_in frames_out results
+rm -rf frames_in frames_out
+mkdir frames_in frames_out
 ffmpeg -i $1 -vf fps=24 frames_in/frame%d.png
 
 python test_fastdvdnet.py --test_path frames_in --save_path frames_out --noise_sigma $2 --max_num_fr_per_seq $3

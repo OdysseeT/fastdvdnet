@@ -21,7 +21,7 @@ import cv2
 import torch
 from skimage.measure.simple_metrics import compare_psnr
 from tensorboardX import SummaryWriter
-
+import traceback
 IMAGETYPES = ('*.bmp', '*.png', '*.jpg', '*.jpeg', '*.tif') # Supported image types
 
 def normalize_augment(datain, ctrl_fr_idx):
@@ -99,7 +99,7 @@ def get_imagenames(seq_dir, pattern=None):
     files.sort(key=lambda f: int(''.join(filter(str.isdigit, f))))
     return files
 
-def open_sequence(files, seq_dir, gray_mode, expand_if_needed=False, max_num_fr=100):
+def open_sequence(video, gray_mode, expand_if_needed=False, start_index=0, max_num_fr=100):
     r""" Opens a sequence of images and expands it to even sizes if necesary
     Args:
         fpath: string, path to image sequence
@@ -117,18 +117,27 @@ def open_sequence(files, seq_dir, gray_mode, expand_if_needed=False, max_num_fr=
 
     seq_list = []
     i = 0
-    for fpath in files[0:max_num_fr]:
+    for idx in range(start_index, start_index+max_num_fr):
+        #print("Reading frame {}".format(idx))
+        video.set(1, idx)
+        ret, frame = video.read()
+        try:
+            img, expanded_h, expanded_w = open_image(frame,\
+                                                        gray_mode=gray_mode,\
+                                                        expand_if_needed=expand_if_needed,\
+                                                        expand_axis0=False)
+        except:
+            print("Error while reading index {}".format(idx))
+            traceback.print_exc()
 
-        img, expanded_h, expanded_w = open_image(fpath,\
-                                                    gray_mode=gray_mode,\
-                                                    expand_if_needed=expand_if_needed,\
-                                                    expand_axis0=False)
         seq_list.append(img)
     seq = np.stack(seq_list, axis=0)
 
     return seq, expanded_h, expanded_w
 
-def open_image(fpath, gray_mode, expand_if_needed=False, expand_axis0=True, normalize_data=True):
+
+
+def open_image(frame, gray_mode, expand_if_needed=False, expand_axis0=True, normalize_data=True):
     r""" Opens an image and expands it if necesary
     Args:
     fpath: string, path of image file
@@ -144,14 +153,17 @@ def open_image(fpath, gray_mode, expand_if_needed=False, expand_axis0=True, norm
     expanded_h: True if original dim H was odd and image got expanded in this dimension.
     expanded_w: True if original dim W was odd and image got expanded in this dimension.
     """
+
+
     if not gray_mode:
         # Open image as a CxHxW torch.Tensor
-        img = cv2.imread(fpath)
+        #img = cv2.imread(fpath)
         # from HxWxC to CxHxW, RGB image
-        img = (cv2.cvtColor(img, cv2.COLOR_BGR2RGB)).transpose(2, 0, 1)
+        img = (cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)).transpose(2, 0, 1)
+
     else:
         # from HxWxC to  CxHxW grayscale image (C=1)
-        img = cv2.imread(fpath, cv2.IMREAD_GRAYSCALE)
+        img = (cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)).transpose(2, 0, 1)
 
     if expand_axis0:
         img = np.expand_dims(img, 0)
